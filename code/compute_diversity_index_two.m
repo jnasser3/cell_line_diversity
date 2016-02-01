@@ -8,7 +8,7 @@ pnames = {'corr_type',...
 dflts = {'pearson',...
     false,...
     false,...
-    '.'};
+    '/cmap/projects/cell_line_diversity/analysis/pairwise_diversity_index/fig'};
 args = parse_args(pnames, dflts, varargin{:});
 
 % Data validation
@@ -32,7 +32,7 @@ for ii = 1:num_perts
         cell2mat(ds2.cdesc(ii,ds1.cdict('distil_cc_q75')))
         0])/max_ccq_75;
     corrs(ii) = corr(ds1.mat(:,ii),ds2.mat(:,ii),...
-                    'args.corr_type');
+                    'type',args.corr_type);
     DI = DI + bioa(ii)*(1 - corrs(ii));
 end
 
@@ -54,7 +54,8 @@ if args.make_plot
     
     if args.save_plot
         savefigures('out',args.plot_dir,...
-                    'closefig',true)
+                    'closefig',true,...
+                    'mkdir',false)
     end
 end
 
