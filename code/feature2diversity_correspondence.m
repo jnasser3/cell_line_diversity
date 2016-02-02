@@ -1,22 +1,24 @@
-function [rho, pval] = feature2diversity_correspondence(feature_ds,diversity_ds,varargin )
+function [rho, pval, feat_vec, div_vec] = feature2diversity_correspondence(feature_ds,diversity_ds,varargin )
 % Computes the correlation between the pairwise distances of cell lines in
 % feature space and the pairwise ditances of cell lines in diversity space.
 %
 % Input: feature_ds: a cell_lines x cell_lines struct where each entry
-%        represents the distance between the lines in feature space.
+%                   represents the distance between the lines in feature space.
 %        diversity_ds: a cell_lines x cell_lines struct where each entry
-%        represents the distance between the lines in diversity space.
+%                   represents the distance between the lines in diversity space.
 %        feature_cell_name_identifier: The feature_ds column identifier
-%        corresponding the cell name. Must be either cid or
-%        a member of feature_ds.chd. Default is cid.
+%                   corresponding the cell name. Must be either cid or
+%                   a member of feature_ds.chd. Default is cid.
 %        diversity_cell_name_identifier: The diversity_ds column identifier
-%        corresponding the cell name. Must be either cid or
-%        a member of diversity_ds.chd. Default is cid.
+%                   corresponding the cell name. Must be either cid or
+%                   a member of diversity_ds.chd. Default is cid.
 %        corr_type: Measure of the correlation between feature and
-%        diversity distances. Default is spearman.
+%                   diversity distances. Default is spearman.
 %
 % Output: rho: the correlation between the distances.
-%         pval = pvalue of this correlation
+%         pval: pvalue of this correlation
+%         feat_vec: vector of distances in feature space
+%         div_vec: vector of distances in diversity space
 
 params = {'feature_cell_name_identifier',...
           'diversity_cell_name_identifier',...
@@ -55,9 +57,21 @@ fprintf('There are %d cell lines in common \n',numel(common_lines));
 
 assert(isequal(feat_ds.cid,div_ds.cid),'ds cids not same order!')
 assert(isequal(feat_ds.rid,div_ds.rid),'ds rids not same order!')
-[rho, pval] = corr(vec_upper_triangle(feat_ds.mat),vec_upper_triangle(div_ds.mat),...
-    'type','spearman',...
+
+feat_vec = vec_upper_triangle(feat_ds.mat);
+div_vec = vec_upper_triangle(div_ds.mat);
+[rho, pval] = corr(feat_vec,div_vec,...
+    'type',args.corr_type,...
     'tail','right');
+
+%Plotting
+scatter(feat_vec,div_vec)
+xlabel('Distance in feature space')
+ylabel('Distance in diversity space')
+title_str = sprintf('N = %d cell lines, %d comparisons \n%s correlation is %.2f, pval is %.2f',...
+    numel(common_lines),nchoosek(numel(common_lines),2),args.corr_type,rho,pval);
+title(title_str)
+
 end
 
 function v = vec_upper_triangle(A)
@@ -73,5 +87,4 @@ T = T(:);
 %index the matrix
 temp = A(:);
 v = temp(T == 1);
-
 end
