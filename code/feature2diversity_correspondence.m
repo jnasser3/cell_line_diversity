@@ -58,8 +58,8 @@ fprintf('There are %d cell lines in common \n',numel(common_lines));
 assert(isequal(feat_ds.cid,div_ds.cid),'ds cids not same order!')
 assert(isequal(feat_ds.rid,div_ds.rid),'ds rids not same order!')
 
-feat_vec = vec_upper_triangle(feat_ds.mat);
-div_vec = vec_upper_triangle(div_ds.mat);
+feat_vec = tri2vec(feat_ds.mat);
+div_vec = tri2vec(div_ds.mat);
 [rho, pval] = corr(feat_vec,div_vec,...
     'type',args.corr_type,...
     'tail','right');
@@ -74,17 +74,3 @@ title(title_str)
 
 end
 
-function v = vec_upper_triangle(A)
-%returns the strictly upper triangle of A in vectorized form. A should be square
-
-[n,m] = size(A);
-assert(n==m, 'A is not square!')
-
-%make the index vector
-T = triu(ones(n),1);
-T = T(:);
-
-%index the matrix
-temp = A(:);
-v = temp(T == 1);
-end
