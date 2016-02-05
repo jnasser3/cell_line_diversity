@@ -36,15 +36,13 @@ mat = zeros(numel(lines));
 pdi = mkgctstruct(mat,'rid',lines,'cid',lines);
 
 %Compute the diversity index for each pair of lines. 
-for ii = 1:numel(lines)
+for ii = 1%:numel(lines)
     idx1 = strcmp(ds.cdesc(:,ds.cdict('cell_id')),lines(ii));
     ds1 = ds_slice(ds,'cidx',find(idx1));
     
-    for jj = (ii+1):numel(lines)
+    for jj = 2%(ii+1):numel(lines)
         idx2 = strcmp(ds.cdesc(:,ds.cdict('cell_id')),lines(jj));
         ds2 = ds_slice(ds,'cidx',find(idx2));
-        
-        args.make_plot
         
         pdi.mat(ii,jj) = compute_diversity_index_two(ds1,ds2,...
             'make_plot',args.make_plot,...

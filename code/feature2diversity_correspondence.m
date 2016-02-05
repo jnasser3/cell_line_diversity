@@ -25,14 +25,14 @@ params = {'feature_cell_name_identifier',...
           'corr_type'};
 dflts = {'cid',...
          'cid',...
-         'spearman'};
+         'Spearman'};
 args = parse_args(params,dflts,varargin{:});
 
 % Get the ds from gctx if necessary
-if exist(feature_ds,'file')
+if isstr(feature_ds)     %exist(feature_ds,'file')
     feature_ds = parse_gctx(feature_ds);
 end
-if exist(diversity_ds,'file')
+if isstr(diversity_ds)   %exist(diversity_ds,'file')
     diversity_ds = parse_gctx(diversity_ds);
 end
 
@@ -65,10 +65,11 @@ div_vec = tri2vec(div_ds.mat);
     'tail','right');
 
 %Plotting
-scatter(feat_vec,div_vec)
+scatter(feat_vec,div_vec, 250, '.')
 xlabel('Distance in feature space')
 ylabel('Distance in diversity space')
-title_str = sprintf('N = %d cell lines, %d comparisons \n%s correlation is %.2f, pval is %.2f',...
+grid on;
+title_str = sprintf('N = %d cell lines, %d comparisons \n%s correlation is %.2f, pval is %0.4f', ...
     numel(common_lines),nchoosek(numel(common_lines),2),args.corr_type,rho,pval);
 title(title_str)
 

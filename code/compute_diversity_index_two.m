@@ -17,6 +17,9 @@ assert(isequal(ds1.rid,ds2.rid), 'Gene space not the same')
 % Order the perts identically b/w ds1 and ds2
 [ds1,ds2] = order_data_sets(ds1, ds2);
 
+ds1.cdesc(1:10,ds1.cdict('pert_id_dose_time'))
+ds2.cdesc(1:10,ds2.cdict('pert_id_dose_time'))
+
 max_ccq_75 = max(...
         [cell2mat(ds1.cdesc(:,ds1.cdict('distil_cc_q75')))
         cell2mat(ds2.cdesc(:,ds1.cdict('distil_cc_q75')))]...
@@ -66,14 +69,16 @@ function [ds1, ds2] = order_data_sets(ds1, ds2)
     [ds1, ds2] = subset_data_sets(ds1,ds2);
     
     %keep ds1 fixed. Order ds2 in the same order as ds1
-    [~,idx] = orderas(ds1.cid,ds2.cid);
-    ds2 = ds_order_meta(ds2, 'column', ds1.cid);
+    [~,idx] = orderas(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')),ds2.cdesc(:,ds2.cdict('pert_id_dose_time')));
+    ds2 = ds_order_meta(ds2, 'column', ds1.cdesc(:,ds1.cdict('pert_id_dose_time')));
     ds2.mat = ds2.mat(:,idx);
 end
 
 function [ds1, ds2] = subset_data_sets(ds1, ds2)
-    %subset data sets to common sig ids
-    ids = intersect(ds1.cid, ds2.cid);
-    ds1 = ds_slice(ds1, 'cid', ids);
-    ds2 = ds_slice(ds2, 'cid', ids);
+    %subset data sets to common combos
+    common_combos = intersect(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')), ds2.cdesc(:,ds2.cdict('pert_id_dose_time')));
+    idx1 = ismember(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')),common_combos);
+    idx2 = ismember(ds2.cdesc(:,ds2.cdict('pert_id_dose_time')),common_combos);
+    ds1 = ds_slice(ds1, 'cidx', find(idx1));
+    ds2 = ds_slice(ds2, 'cidx', find(idx2));
 end
