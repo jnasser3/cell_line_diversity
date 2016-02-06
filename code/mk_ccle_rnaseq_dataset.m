@@ -1,12 +1,40 @@
-%Load the original ccle rna seq data set
+%% Load the original ccle rna seq data set
 ds = parse_gctx('/cmap/projects/stacks/STK035_BASE_RNASEQ/STK035_BASE_RNASEQ_L1KFULL_LOG2_n1023x12450.gctx');
 
-%Remove the bad sample.
+%% Remove the bad sample.
 C = fastcorr(ds.mat,'type','pearson');
 bad_idx = find((sum(C) == 0));
 good_ds = ds_slice(ds,'cid',ds.cid(bad_idx),'exclude_cid',true);
 
-%annotate tissue type
+%% Get and remove column data from ds
+% we need to do this because we do not have prism annotations for all
+% samples
+metastruct = meta2struct(good_ds, 'dim', 'column');
+good_ds = ds_delete_meta(good_ds, 'column', good_ds.chd);
+
+%% Add PRISM annotations
+prism_annot = parse_tbl('/cmap/projects/cell_line_diversity/data/PRISM_database.tsv','outfmt','record');
+
+%subset to common ids
+common_ids = intersect({prism_annot.strippedname},{metastruct.cell_id});
+prism_annot = prism_annot(ismember({prism_annot.strippedname},common_ids));
+
+%The 'strippedname' field in prism_annot matches the 'cell_id' field in ds.cdesc
+%So annotate the prism annot with the appropriate cids. Then use annotate_ds
+name2id_map = containers.Map({metastruct.cell_id},{metastruct.id});
+ids_for_prism_table = {};
+for ii = 1:numel({prism_annot.strippedname})
+    prism_annot(ii).temp_id = name2id_map(prism_annot(ii).strippedname);
+end
+good_ds = annotate_ds(good_ds,prism_annot,...
+    'dim','column',...
+    'keyfield','temp_id',...
+    'skipmissing',true);
+
+%% Add back in column meta
+good_ds = annotate_ds(good_ds,metastruct);
+
+%% annotate tissue type
 tissue_type = {};
 for ii = 1:numel(good_ds.cid)
     try
