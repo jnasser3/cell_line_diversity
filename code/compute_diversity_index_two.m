@@ -3,9 +3,11 @@ function DI = compute_diversity_index_two(ds1, ds2, varargin)
 
 pnames = {'corr_type',...
     'make_plot',...
+    'show_plot',...
     'save_plot',...
     'plot_dir'};
 dflts = {'pearson',...
+    false,...
     false,...
     false,...
     '/cmap/projects/cell_line_diversity/analysis/pairwise_diversity_index/fig'};
@@ -27,7 +29,8 @@ bioactivity_mat = [...
     cell2mat(ds2.cdesc(:,ds2.cdict('distil_cc_q75'))),...
     zeros(size(ds1.mat,2),1)
     ];
-bioa = max(bioactivity_mat,[],2)/max_ccq_75;
+%bioa = max(bioactivity_mat,[],2)/max_ccq_75;
+bioa = max(bioactivity_mat,[],2);
 
 %compute pairwise correlations
 corrs = pwcorr(ds1.mat,ds2.mat);
@@ -47,8 +50,12 @@ DI = sum(bioa .* (1 - corrs)) / num_perts;
 % end
 
 if args.make_plot
-    figure;
-    namefig(strcat(ds1.cdesc{1,ds1.cdict('cell_id')},'_',ds2.cdesc{1,ds2.cdict('cell_id')}))
+    if args.show_plot
+        figure;
+    else
+        figure('Visible','Off');
+    end
+    namefig(strcat(ds1.cdesc{1,ds1.cdict('cell_id')},'_',ds2.cdesc{1,ds2.cdict('cell_id')}));
     scatter(bioa,corrs,[],bioa .* (1 - corrs))
     axis([0 1 0 1])
     colormap(cool)
@@ -56,17 +63,12 @@ if args.make_plot
     caxis([0, 1])
     xlabel('Max Bioactivity')
     ylabel('Correlation')
-    title_str = sprintf('Bioactivity vs correlation for perts in %s and %s,\n Diversity index is: %.2f',...
+    title_str = sprintf('Bioactivity vs correlation for perts in %s and %s,\n Num perts is: %d \n Diversity index is: %.3f',...
         ds1.cdesc{1,ds1.cdict('cell_id')},...
         ds2.cdesc{1,ds2.cdict('cell_id')},...
+        num_perts,...
         DI);
     title(title_str)
-    
-    if args.save_plot
-        savefigures('out',args.plot_dir,...
-                    'closefig',true,...
-                    'mkdir',false)
-    end
 end
 
 end
