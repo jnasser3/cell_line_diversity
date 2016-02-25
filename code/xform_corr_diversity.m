@@ -1,4 +1,5 @@
 function [xformcorrs] = xform_corr_diversity(corrs,null0)
+%[xformcorrs] = xform_corr_diversity(corrs,null0)
 %
 %Given a null distribution and a set of observations. Computes the rank of each
 %observation with respect to the null in a transformed way. 
