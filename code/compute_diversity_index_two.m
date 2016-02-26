@@ -1,4 +1,4 @@
-function DI = compute_diversity_index_two(ds1, ds2, varargin)
+function [DI,all_corrs] = compute_diversity_index_two(ds1, ds2, varargin)
 %Given expression matrices for two cell lines, computes their diversity index.
 
 pnames = {'metric',...
@@ -6,11 +6,11 @@ pnames = {'metric',...
     'show_plot',...
     'save_plot',...
     'plot_dir'};
-dflts = {'basic_bioa_corr',...
+dflts = {'rel_bioa_corr',...
     false,...
     false,...
     false,...
-    ''};
+    '/cmap/projects/cell_line_diversity/analysis/pairwise_diversity_index/core_ts/rel_bioa_corr/fig'};
 args = parse_args(pnames, dflts, varargin{:});
 
 % Data validation
@@ -19,11 +19,17 @@ assert(isequal(ds1.rid,ds2.rid), 'Gene space not the same')
 % Order the perts identically b/w ds1 and ds2
 [ds1,ds2] = order_data_sets(ds1, ds2);
 
+assert(isequal(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')),...
+    ds2.cdesc(:,ds2.cdict('pert_id_dose_time'))), 'Sample space not ordered the same')
+
+% Load bioactivity background
+load /cmap/projects/cell_line_diversity/data/ts_cp_ccq75.mat
+
 switch lower(args.metric)
     case 'basic_bioa_corr'
         DI = basic_bioa_corr(ds1,ds2,args);
-    case 'rel_wtd_corr'
-        DI = rel_wtd_corr(ds1,ds2,args);
+    case 'rel_bioa_corr'
+        [DI, all_corrs] = rel_wtd_corr(ds1,ds2,ts_cp_ccq75,args);
     case 'cov_fro'
         DI = covariance_frobenius(ds1,ds2);  
     case 'cov_eig'
@@ -33,14 +39,20 @@ end
 
 function [ds1, ds2] = order_data_sets(ds1, ds2)
     %order data sets by pert_id_dose_time combo
-    [ds1, ds2] = subset_data_sets(ds1,ds2);
     ds1 = remove_duplicates(ds1,'pert_id_dose_time');
     ds2 = remove_duplicates(ds2,'pert_id_dose_time');
+    [ds1, ds2] = subset_data_sets(ds1,ds2);
 
-    %keep ds1 fixed. Order ds2 in the same order as ds1
-    [~,idx] = orderas(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')),ds2.cdesc(:,ds2.cdict('pert_id_dose_time')));
-    ds2 = ds_order_meta(ds2, 'column', ds1.cdesc(:,ds1.cdict('pert_id_dose_time')));
-    ds2.mat = ds2.mat(:,idx);
+    %Order both datasets alphabetically
+    %[~,idx] = orderas(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')),ds2.cdesc(:,ds2.cdict('pert_id_dose_time')));
+    [~,idx1] = sort(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')));
+    [~,idx2] = sort(ds2.cdesc(:,ds2.cdict('pert_id_dose_time')));
+    
+    ds1.cdesc = ds1.cdesc(idx1,:);
+    ds1.mat = ds1.mat(:,idx1);
+    
+    ds2.cdesc = ds2.cdesc(idx2,:);
+    ds2.mat = ds2.mat(:,idx2);
 end
 
 function [ds1, ds2] = subset_data_sets(ds1, ds2)
@@ -127,19 +139,148 @@ cov2 = cov(ds2.mat');
 DI = norm(cov1 - cov2, 'fro');
 end
 
-function DI = rel_wtd_corr(ds1,ds2,args)
+function [DI, all_corrs] = rel_wtd_corr(ds1,ds2,bioa_bkg,args)
 
 %get corr contributions
 all_corrs = fastcorr(ds1.mat,ds2.mat);
-corr_contributions = xform_corr_diversity(diag(all_corrs),tri2vec(all_corrs));
+corr_contribution = xform_corr_diversity(diag(all_corrs),tri2vec(all_corrs));
 
 %get bioactiviy cdfs and convert to cdf contributions
 bioa1 = cell2mat(ds1.cdesc(:,ds1.cdict('distil_cc_q75')));
-bioa1 = rankorder(bioa1)/numel(bioa1);
-bioa2 = cell2mat(ds1.cdesc(:,ds1.cdict('distil_cc_q75')));
-bioa2 = rankorder(bioa2)/numel(bioa2);
+bioa2 = cell2mat(ds2.cdesc(:,ds2.cdict('distil_cc_q75')));
+bioa1_rel = xform_bioa_diversity(bioa1, bioa_bkg);
+bioa2_rel = xform_bioa_diversity(bioa2, bioa_bkg);
 
-max_bioa = max([bioa1, bioa2], [], 2);
-DI = sum(corr_contributions .* max_bioa) / sum(max_bioa);
+bioa_contribution = max([bioa1_rel, bioa2_rel], [], 2);
+DI = sum(corr_contribution .* bioa_contribution) / sum(bioa_contribution);
+sum(bioa_contribution);
 
+if args.make_plot
+    
+    cell1 = ds1.cdesc{1,ds1.cdict('cell_id')};
+    cell2 = ds2.cdesc{1,ds2.cdict('cell_id')};
+
+    mk_di_scatter2(max([bioa1, bioa2], [], 2),...
+        diag(all_corrs),...
+        corr_contribution .* bioa_contribution,...
+        DI,...
+        cell1,...
+        cell2,...
+        args);
+    
+%     mk_di_scatter3(bioa1,...
+%         bioa2,...
+%         diag(all_corrs),...
+%         corr_contribution .* bioa_contribution,...
+%         DI,...
+%         cell1,...
+%         cell2,...
+%         args);
+    
+    mk_corr_plot(all_corrs,...
+        cell1,...
+        cell2,...
+        args);
+
+end
+end
+
+function h = mk_di_scatter2(bioa,corrs,DI_contribution,DI,cell1_name,cell2_name,args)
+    if args.show_plot
+        h = figure;
+    else
+        h = figure('Visible','Off');
+    end
+    name = strcat(cell1_name,...
+        '_',cell2_name,...
+        '_scatter2');
+    namefig(h,name);
+    scatter(bioa,corrs,[],DI_contribution)
+    axis([0 1 -1 1])
+    colormap(cool)
+    colorbar
+    caxis([0, 1])
+    grid on
+    xlabel('Bioactivity')
+    ylabel('Correlation')
+    title_str = sprintf('Bioactivity vs correlation for perts in %s and %s \n metric: %s \n Num perts: %d \n Diversity index is: %.3f',...
+        cell1_name,...
+        cell2_name,...
+        args.metric,...
+        numel(bioa),...
+        DI);
+    title(title_str,'interpreter','none')
+    
+    if args.save_plot
+        saveas(h,strcat(fullfile(args.plot_dir,name),'.png'),'png')
+        close;
+    end
+end
+
+function h = mk_di_scatter3(bioa1,bioa2,corrs,DI_contribution,DI,cell1_name,cell2_name,args)
+    if args.show_plot
+        h = figure;
+    else
+        h = figure('Visible','Off');
+    end
+    name = strcat(cell1_name,...
+        '_',cell2_name,...
+        '_scatter3');
+    namefig(h,name);
+    scatter3(bioa1,bioa2,corrs,[],DI_contribution)
+    axis([0 1 0 1 -1 1])
+    colormap(cool)
+    colorbar
+    caxis([0, 1])
+    grid on
+    xlabel([cell1_name ' ccq75'])
+    ylabel([cell2_name ' ccq75'])
+    zlabel('Correlation')
+    title_str = sprintf('Bioactivity vs correlation for perts in %s and %s,\n metric: %s \n Num perts is: %d \n Diversity index is: %.3f',...
+        cell1_name,...
+        cell2_name,...
+        args.metric,...
+        numel(bioa1),...
+        DI);
+    title(title_str,'Interpreter','none')
+    
+    if args.save_plot
+        saveas(h,strcat(fullfile(args.plot_dir,name),'.png'),'png')
+        close;
+    end
+end
+
+function h = mk_corr_plot(all_corrs,cell1,cell2,args)
+
+    if args.show_plot
+        h = figure;
+    else
+        h = figure('Visible','Off');
+    end
+    
+    name = strcat(cell1,...
+        '_',cell2,...
+        '_corr');
+    namefig(h,name);
+    
+    [fnull, xnull] = ksdensity(tri2vec(all_corrs));
+    [fmatch, xmatch] = ksdensity(diag(all_corrs));
+    plot(xnull,fnull,'DisplayName','Null - all pairs');
+    hold on
+    plot(xmatch,fmatch,'DisplayName','Matched pairs');
+    title_str = sprintf('Null vs matched correlation for perts in %s and %s,\n Num perts is: %d',...
+    cell1,...
+    cell2,...
+    size(all_corrs,1));
+    title(title_str)
+    grid on
+    axis([-1 1 0 8])
+    xlabel('Correlation')
+    ylabel('Frequency')
+    legend('show')
+    
+    if args.save_plot
+        saveas(h,strcat(fullfile(args.plot_dir,name),'.png'),'png')
+        close;
+    end
 end
