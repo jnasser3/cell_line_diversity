@@ -48,22 +48,22 @@ pdi = mkgctstruct(mat,'rid',lines,'cid',lines);
 
 %Compute the diversity index for each pair of lines. 
 for ii = 1:numel(lines)
+    ii
     idx1 = strcmp(ds.cdesc(:,ds.cdict('cell_id')),lines(ii));
     ds1 = ds_slice(ds,'cidx',find(idx1));
     
     %remove samples that have -666 for distil_cc_q75
     bad_idx = cell2mat((ds1.cdesc(:,ds1.cdict('distil_cc_q75')))) == -666;
     ds1 = ds_slice(ds1, 'cid', ds1.cid(bad_idx), 'exclude_cid', true);
-    find(bad_idx)
     
     for jj = (ii+1):numel(lines)
+        jj
         idx2 = strcmp(ds.cdesc(:,ds.cdict('cell_id')),lines(jj));
         ds2 = ds_slice(ds,'cidx',find(idx2));
         
         %remove samples that have -666 for distil_cc_q75
         bad_idx = cell2mat((ds2.cdesc(:,ds2.cdict('distil_cc_q75')))) == -666;
         ds2 = ds_slice(ds2, 'cid', ds2.cid(bad_idx), 'exclude_cid', true);
-        find(bad_idx)
 
         [DI, all_corrs] = compute_diversity_index_two(ds1,ds2,...
             'metric',args.metric,...
