@@ -1,4 +1,6 @@
 function bioa = mk_bioactivity_struct(ds, varargin)
+%bioa = mk_bioactivity_struct(ds, varargin)
+%
 %Given an annotated data set, create a perts x cell lines matrix whose
 %(i,j) entry is the cc_q75 of pert i in cell line j.
 %

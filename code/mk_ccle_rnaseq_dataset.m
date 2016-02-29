@@ -36,6 +36,7 @@ good_ds = annotate_ds(good_ds,metastruct);
 
 %% annotate tissue type
 tissue_type = {};
+backup_annot = parse_tbl('/cmap/projects/cell_line_diversity/data/ccle_rna_seq_missing_lineage_annot.txt','outfmt','record');
 for ii = 1:numel(good_ds.cid)
     try
         str = good_ds.cid{ii};
@@ -49,9 +50,21 @@ for ii = 1:numel(good_ds.cid)
     end
 end
 tissue_type_struct = struct('cid',good_ds.cid,'tissue_type',tissue_type');
-good_ds = annotate_ds(good_ds,tissue_type_struct,...
+good_ds = annotate_ds(good_ds,...
+    tissue_type_struct,...
     'dim','column',...
     'keyfield','cid');
+
+%If we can't extract tissue from the id, look in the backup file
+for jj = 1:numel(good_ds.cid)
+    if strcmp(good_ds.cdesc(jj,good_ds.cdict('tissue_type')),'-666')
+        idx = find(strcmp({backup_annot.cell_id},good_ds.cid(jj)));
+        
+        if ~strcmp({backup_annot(idx).tissue_type},'')
+            good_ds.cdesc(jj,good_ds.cdict('tissue_type')) = {backup_annot(idx).tissue_type};
+        end
+    end
+end
 
 %make the gctx
 mkgctx('/cmap/projects/cell_line_diversity/data/CCLE_BASELINE_RNASEQ_L1KFULL_RPKM_LOG2.gctx',good_ds)
