@@ -1,8 +1,8 @@
-function [xformcorrs] = xform_corr_diversity(corrs,null0)
+function [xformcorrs,xform,x2] = xform_corr_diversity(corrs,null0)
 %[xformcorrs] = xform_corr_diversity(corrs,null0)
 %
-%Given a null distribution and a set of observations. Computes the rank of each
-%observation with respect to the null in a transformed way. 
+%Given a null distribution of correlations and a set of observations,
+%computes the strength of the observations relative to the null.
 
 [xform,x2] = compute_xform(null0);
 xformcorrs = interp1(x2,xform,corrs);

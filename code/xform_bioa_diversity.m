@@ -1,4 +1,4 @@
-function xformbioa = xform_bioa_diversity(bioa,bkg)
+function [xformbioa,xform,x2] = xform_bioa_diversity(bioa,bkg)
 %[xformbioa] = xform_bioa_diversity(bioa,bkg)
 %
 %Given a background of cc_q75's, computes the strength of the observed
