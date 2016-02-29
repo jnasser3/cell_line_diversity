@@ -80,16 +80,20 @@ function ret = calc_gex_sim(ds, args)
   switch args.metric
     case 'euclidean'
       % Ghetto
-      sim = zeros(numel(ds.cid), numel(ds.cid));
-      for k = 1:numel(ds.cid)
-        sim(:,k) = sqrt(sum((ds.mat - repmat(ds.mat(:,k), 1, numel(ds.cid))).^2));
-      end
+%       sim = zeros(numel(ds.cid), numel(ds.cid));
+%       for k = 1:numel(ds.cid)
+%         sim(:,k) = sqrt(sum((ds.mat - repmat(ds.mat(:,k), 1, numel(ds.cid))).^2));
+%       end
+        sim = squareform(pdist(ds.mat', 'euclidean')); 
+    
+    case 'seuclidean'
+        sim = squareform(pdist(ds.mat', 'seuclidean')); 
 
     case 'cosine'
       % 1-cosine(x)
-      amag = diag(diag(sqrt(ds.mat' * ds.mat)));
-      sim = 1 - amag \ ds.mat' * ds.mat / amag;
-
+%       amag = diag(diag(sqrt(ds.mat' * ds.mat)));
+%       sim = 1 - amag \ ds.mat' * ds.mat / amag;
+        sim = squareform(pdist(ds.mat', 'cosine'));
   end
 
   ret = mkgctstruct(sim, 'rid', ds.cid, 'cid', ds.cid, 'rdesc', ds.cdesc, 'cdesc', ds.cdesc, 'chd', ds.chd, 'rhd', ds.chd);
