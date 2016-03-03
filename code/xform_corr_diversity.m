@@ -1,22 +1,27 @@
-function [xformcorrs,xform,x2] = xform_corr_diversity(corrs,null0)
+function [xformcorrs,xform,x2] = xform_corr_diversity(corrs,null0,kde_method)
 %[xformcorrs] = xform_corr_diversity(corrs,null0)
 %
 %Given a null distribution of correlations and a set of observations,
 %computes the strength of the observations relative to the null.
 
-[xform,x2] = compute_xform(null0);
+[xform,x2] = compute_xform(null0,kde_method);
 xformcorrs = interp1(x2,xform,corrs);
 
 end
 
-function [xform,x2] = compute_xform(null0)
+function [xform,x2] = compute_xform(null0,kde_method)
 %Create the function that maps correlation to contribution.
 %Less than the median null map to 1
 %Greater than the max null map to 0
 %In between follow the pdf of the null
 
-numpoints = 1000;
-[f, x] = ksdensity(null0,'npoints',numpoints);
+numpoints = 1024;
+switch kde_method
+    case 'matlab'
+        [f, x] = ksdensity(null0,'npoints',numpoints);
+    case 'fast_kde'
+        [~,f, x] = kde(null0,numpoints);
+end
 f = f / max(f);
 
 med0 = median(null0);
