@@ -10,14 +10,17 @@ function [pdi, all_corrs] = compute_pairwise_diversity_index(ds, varargin)
 %                   Options are {'matlab','fast_kde'}. Default is 'fast_kde'
 %       cell_lines: cell array or .grp of lines for which to compute
 %                   pairwise diversities. Default: all in ds.
-%       make_plot: Boolean, whether to make plots. Default 0
-%       show_plot: Boolean, whether to make plot visible. Default 0
-%       save_plot: Boolean, whether to save plots to disk. Default 0
+%       make_plot: Boolean, whether to make plots. Default false
+%       show_plot: Boolean, whether to make plot visible. Default false
+%       save_plot: Boolean, whether to save plots to disk. Default false
 %       plot_dir:  Directory to save plots to. 
+%       save_gctx: Boolean, whether to save the pairwise distance gctx.
+%                  Defualt false
+%       gctx_dir: Directory to save gctx to
 %                
 %Output: pdi: a structure of Pairwise Diversity Index. pdi.mat is a
-%cell_lines x cell_lines matrix with pdi.mat(i,j) being the diversity index
-%between cell_line i and cell_line j
+%        cell_lines x cell_lines matrix with pdi.mat(i,j) being the diversity index
+%        between cell_line i and cell_line j
 
 params = {'cell_lines',...
           'metric',...
@@ -25,16 +28,21 @@ params = {'cell_lines',...
           'make_plot',...
           'show_plot',...
           'save_plot',...
-          'plot_dir'};
+          'plot_dir',...
+          'save_gctx',...
+          'gctx_dir'};
 dflts = {'',...
          'rel_bioa_corr',...
          'fast_kde',...
          false,...
          false,...
          false,...
-         '/cmap/projects/cell_line_diversity/analysis/pairwise_diversity_index/core_ts/rel_bioa_corr/fig'};
+         '.',...
+         false,...
+         '.'};
 args = parse_args(params,dflts,varargin{:});
 
+%Get cell lines
 if isempty(args.cell_lines)
     lines = unique(ds.cdesc(:,ds.cdict('cell_id')));
 elseif iscell(args.cell_lines)
@@ -81,5 +89,13 @@ end
 
 %Fill in the lower triangle
 pdi.mat = pdi.mat + pdi.mat';
+
+%save the gctx and make config file
+if args.save_gctx
+    mkgctx(fullfile(args.gctx_dir,'pdi.gctx'),pdi)
+    mkconfigyaml(fullfile(args.gctx_dir,'config.yaml'),args)
+end
+
+
 end
 
