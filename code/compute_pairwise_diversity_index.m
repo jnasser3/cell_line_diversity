@@ -10,6 +10,8 @@ function [pdi, all_corrs] = compute_pairwise_diversity_index(ds, varargin)
 %                   Options are {'matlab','fast_kde'}. Default is 'fast_kde'
 %       cell_lines: cell array or .grp of lines for which to compute
 %                   pairwise diversities. Default: all in ds.
+%       pert_ids: cell array or .grp of pert_ids on which to compute
+%                   pairwise diversities.
 %       make_plot: Boolean, whether to make plots. Default false
 %       show_plot: Boolean, whether to make plot visible. Default false
 %       save_plot: Boolean, whether to save plots to disk. Default false
@@ -23,6 +25,7 @@ function [pdi, all_corrs] = compute_pairwise_diversity_index(ds, varargin)
 %        between cell_line i and cell_line j
 
 params = {'cell_lines',...
+          'pert_ids',...
           'metric',...
           'kde_method',...
           'make_plot',...
@@ -32,6 +35,7 @@ params = {'cell_lines',...
           'save_gctx',...
           'gctx_dir'};
 dflts = {'',...
+         '',...
          'rel_bioa_corr',...
          'fast_kde',...
          false,...
@@ -42,17 +46,13 @@ dflts = {'',...
          '.'};
 args = parse_args(params,dflts,varargin{:});
 
-%Get cell lines
-if isempty(args.cell_lines)
-    lines = unique(ds.cdesc(:,ds.cdict('cell_id')));
-elseif iscell(args.cell_lines)
-    lines = args.cell_lines;
-else
-    lines = parse_grp(args.cell_lines);
-end
+%get cell lines and pert ids
+lines = get_array_input(args.cell_lines,unique(ds.cdesc(:,ds.cdict('cell_id'))));
+pert_ids = get_array_input(args.pert_ids,unique(ds.cdesc(:,ds.cdict('pert_id'))));
 
 %Make sure we have at least two cell lines
 assert(numel(lines) >= 2, 'Must have at least two cell lines')
+assert(numel(pert_ids) >= 2, 'Must have at least two pert ids')
 
 %initialize pdi
 mat = zeros(numel(lines));
@@ -62,26 +62,16 @@ pdi = mkgctstruct(mat,'rid',lines,'cid',lines);
 for ii = 1:numel(lines)
     idx1 = strcmp(ds.cdesc(:,ds.cdict('cell_id')),lines(ii));
     ds1 = ds_slice(ds,'cidx',find(idx1));
-    
-    %remove samples that have -666 for distil_cc_q75
-    bad_idx = cell2mat((ds1.cdesc(:,ds1.cdict('distil_cc_q75')))) == -666;
-    ds1 = ds_slice(ds1, 'cid', ds1.cid(bad_idx), 'exclude_cid', true);
-    
+    ds1 = subset_ds(ds1,...
+        'pert_id',pert_ids);
+
     for jj = (ii+1):numel(lines)
         idx2 = strcmp(ds.cdesc(:,ds.cdict('cell_id')),lines(jj));
         ds2 = ds_slice(ds,'cidx',find(idx2));
-        
-        %remove samples that have -666 for distil_cc_q75
-        bad_idx = cell2mat((ds2.cdesc(:,ds2.cdict('distil_cc_q75')))) == -666;
-        ds2 = ds_slice(ds2, 'cid', ds2.cid(bad_idx), 'exclude_cid', true);
+        ds2 = subset_ds(ds2,...
+            'pert_id',pert_ids);
 
-        [DI, all_corrs] = compute_diversity_index_two(ds1,ds2,...
-            'metric',args.metric,...
-            'kde_method',args.kde_method,...
-            'make_plot',args.make_plot,...
-            'show_plot',args.show_plot,...
-            'save_plot',args.save_plot,...
-            'plot_dir',args.plot_dir);
+        [DI, all_corrs] = compute_diversity_index_two(ds1,ds2,args);
         
         pdi.mat(ii,jj) = DI;
     end
@@ -99,3 +89,12 @@ end
 
 end
 
+function ds = subset_ds(ds,field,to_include)
+%remove samples that have -666 for distil_cc_q75
+bad_idx = cell2mat((ds.cdesc(:,ds.cdict('distil_cc_q75')))) == -666;
+ds = ds_slice(ds, 'cid', ds.cid(bad_idx), 'exclude_cid', true);
+
+%subset ds to field to include
+good_idx = find(ismember(ds.cdesc(:,ds.cdict(field)),to_include));
+ds = ds_slice(ds, 'cidx', good_idx);
+end
