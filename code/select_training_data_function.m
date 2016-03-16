@@ -1,7 +1,7 @@
 function out_ds = select_training_data_function(ds,varargin)
 %out_ds = select_training_data_function(ds,varargin)
 %
-%Takes as input an annotate genes x samples struct. Returns a new struct 
+%Takes as input an annotated genes x samples struct. Returns a new struct 
 %which contains one unique signature per cell line. 'unique' is defined in
 %the sense of some column annotation. 
 %
@@ -25,20 +25,13 @@ dflts = {'',...
          2};
 args = parse_args(params,dflts,varargin{:});
 
-if exist(args.cell_lines,'file')
-    cell_lines = parse_grp(args.cell_lines);
-elseif ~isempty(args.cell_lines)
-    cell_lines = args.cell_lines;
-else
-    cell_lines = unique(ds.cdesc(:,ds.cdict('cell_id')));
-end
+cell_lines = get_array_input(args.cell_lines,unique(ds.cdesc(:,ds.cdict('cell_id'))));
 match_field = ds.cdesc(:,ds.cdict(args.match_field));
 
 num_lines = numel(cell_lines);
 
 %remove all signatures not having enough replicates
 good_rep_idx = find(cell2mat((ds.cdesc(:,ds.cdict('distil_nsample')))) >= args.min_rep);
-nnz(good_rep_idx)
 ds = ds_slice(ds,'cidx',good_rep_idx);
 
 %Find all combos appearing at least 9 times

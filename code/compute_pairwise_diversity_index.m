@@ -5,6 +5,11 @@ function [pdi, all_corrs] = compute_pairwise_diversity_index(ds, varargin)
 %cell lines
 %
 %Input: ds: a genes x perturbagens struct containing the gex data
+%       prune_ds: Boolean. If true we only consider signatures that have a
+%                   prune_field appearing across ALL cell lines in the ds. Setting
+%                   prune_ds to true ensures that all pairwise distances between lines
+%                   are computed using the same set of perturbagens. Default true.
+%       prune_field: The column field to match on. Default is 'pert_id_dose_time'
 %       metric: The metric used to quantify diversity.
 %       corr_type: Type of correlation to use. Default is spearman.
 %       kde_method: Function used to compute kernel density estimate.
@@ -25,7 +30,9 @@ function [pdi, all_corrs] = compute_pairwise_diversity_index(ds, varargin)
 %        cell_lines x cell_lines matrix with pdi.mat(i,j) being the diversity index
 %        between cell_line i and cell_line j
 
-params = {'cell_lines',...
+params = {'prune_ds',...
+          'prune_field',...
+          'cell_lines',...
           'pert_ids',...
           'metric',...
           'corr_type',...
@@ -36,7 +43,9 @@ params = {'cell_lines',...
           'plot_dir',...
           'save_gctx',...
           'gctx_dir'};
-dflts = {'',...
+dflts = {true,...
+         'pert_id_dose_time',...
+         '',...
          '',...
          'rel_bioa_corr',...
          'spearman',...
@@ -49,41 +58,47 @@ dflts = {'',...
          '.'};
 args = parse_args(params,dflts,varargin{:});
 
+%% Preprocessing
 %get cell lines and pert ids
-lines = get_array_input(args.cell_lines,unique(ds.cdesc(:,ds.cdict('cell_id'))));
+cell_lines = get_array_input(args.cell_lines,unique(ds.cdesc(:,ds.cdict('cell_id'))));
 pert_ids = get_array_input(args.pert_ids,unique(ds.cdesc(:,ds.cdict('pert_id'))));
 
 %Make sure we have at least two cell lines
-assert(numel(lines) >= 2, 'Must have at least two cell lines')
+assert(numel(cell_lines) >= 2, 'Must have at least two cell lines')
 assert(numel(pert_ids) >= 2, 'Must have at least two pert ids')
 
+%subset ds to pert_ids
+if ~isempty(pert_ids)
+    ds = subset_ds(ds,'pert_id',pert_ids);
+end
+
+%Remove signatures that have -666 for ccq75 (ones that have 1 replicate)
+bad_idx = cell2mat((ds.cdesc(:,ds.cdict('distil_cc_q75')))) == -666;
+ds = ds_slice(ds, 'cid', ds.cid(bad_idx), 'exclude_cid', true);
+
+%If requested subset ds to only signatures that appear once in each line.
+if args.prune_ds
+    ds = select_training_data_function(ds,'cell_lines',cell_lines,'match_field',args.prune_field);  
+end
+
 %initialize pdi
-mat = zeros(numel(lines));
-pdi = mkgctstruct(mat,'rid',lines,'cid',lines);
+mat = zeros(numel(cell_lines));
+pdi = mkgctstruct(mat,'rid',cell_lines,'cid',cell_lines);
 
-%Compute the diversity index for each pair of lines. 
-for ii = 1:numel(lines)
-    idx1 = strcmp(ds.cdesc(:,ds.cdict('cell_id')),lines(ii));
-    ds1 = ds_slice(ds,'cidx',find(idx1));
-    ds1 = subset_ds(ds1,...
-        'pert_id',pert_ids);
+%% Compute the diversity index for each pair of lines. 
+for ii = 1:numel(cell_lines)
+    ds1 = subset_ds(ds,'cell_id',cell_lines(ii));
 
-    for jj = (ii+1):numel(lines)
-        idx2 = strcmp(ds.cdesc(:,ds.cdict('cell_id')),lines(jj));
-        ds2 = ds_slice(ds,'cidx',find(idx2));
-        ds2 = subset_ds(ds2,...
-            'pert_id',pert_ids);
-
-        [DI, all_corrs] = compute_diversity_index_two(ds1,ds2,args);
-        
-        pdi.mat(ii,jj) = DI;
+    for jj = (ii+1):numel(cell_lines)
+        ds2 = subset_ds(ds,'cell_id',cell_lines(jj));
+        pdi.mat(ii,jj) = compute_diversity_index_two(ds1,ds2,args);
     end
 end
 
 %Fill in the lower triangle
 pdi.mat = pdi.mat + pdi.mat';
 
-%save the gctx and make config file
+%% Save the gctx and make config file
 if args.save_gctx
     mkgctx(fullfile(args.gctx_dir,'pdi.gctx'),pdi)
     mkconfigyaml(fullfile(args.gctx_dir,'config.yaml'),args)
@@ -93,11 +108,6 @@ end
 end
 
 function ds = subset_ds(ds,field,to_include)
-%remove samples that have -666 for distil_cc_q75
-bad_idx = cell2mat((ds.cdesc(:,ds.cdict('distil_cc_q75')))) == -666;
-ds = ds_slice(ds, 'cid', ds.cid(bad_idx), 'exclude_cid', true);
-
-%subset ds to field to include
-good_idx = find(ismember(ds.cdesc(:,ds.cdict(field)),to_include));
-ds = ds_slice(ds, 'cidx', good_idx);
+    good_idx = find(ismember(ds.cdesc(:,ds.cdict(field)),to_include));
+    ds = ds_slice(ds, 'cidx', good_idx);
 end

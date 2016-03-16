@@ -28,8 +28,8 @@ if ~strcmp(args.ds2_id_field,'cid')
     ds2.rid = ds2.cid;
 end
 
-common_ids = intersect(ds1.cid, ds2.cid);
 %get the cell lines to include
+common_ids = intersect(ds1.cid, ds2.cid);
 if isempty(args.ids)
     args.ids = common_ids;
 else

@@ -207,7 +207,7 @@ function h = mk_di_scatter2(bioa,corrs,DI_contribution,DI,cell1_name,cell2_name,
     colorbar
     caxis([0, 1])
     grid on
-    xlabel('Bioactivity')
+    xlabel('Maximum Replicate Reproducibility')
     ylabel('Correlation')
     title_str = sprintf('Bioactivity vs correlation for perts in %s and %s \n metric: %s \n Num perts: %d \n Diversity index is: %.3f',...
         cell1_name,...
