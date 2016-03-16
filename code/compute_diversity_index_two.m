@@ -149,7 +149,7 @@ all_corrs = fastcorr(ds1.mat,ds2.mat,...
 matched_corrs = diag(all_corrs);
 unmatched_corrs = [tri2vec(all_corrs); tri2vec(all_corrs,false)];
 corr_contribution = xform_corr_diversity(matched_corrs,unmatched_corrs,...
-    args.kde_method);
+    'cdf',args.kde_method);
 
 %get bioactiviy cdfs and convert to cdf contributions
 bioa1 = cell2mat(ds1.cdesc(:,ds1.cdict('distil_cc_q75')));
