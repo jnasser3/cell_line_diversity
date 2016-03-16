@@ -144,7 +144,8 @@ end
 function [DI, all_corrs] = rel_wtd_corr(ds1,ds2,bioa_bkg,args)
 
 %get corr contributions
-all_corrs = fastcorr(ds1.mat,ds2.mat);
+all_corrs = fastcorr(ds1.mat,ds2.mat,...
+    'type',args.corr_type);
 matched_corrs = diag(all_corrs);
 unmatched_corrs = [tri2vec(all_corrs); tri2vec(all_corrs,false)];
 corr_contribution = xform_corr_diversity(matched_corrs,unmatched_corrs,...
