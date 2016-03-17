@@ -12,6 +12,8 @@ function [sim, excl] = compute_genex_sim(varargin)
 %     cells     - A cell array of cell lines.  If empty (default), computes on all available cell lines
 %     metric    - string; the distance function.  Supported: 'euclidean' (default), 'cosine' (distance: 1-cosine)
 %     ccleds    - string, which determines which ccleds to use.  Supported: rnaseq (default)
+%     gene_space - .grp file or cell array. Space of genes in which to
+%                  compute distances. Default is all genes in the ds.
 %     plot      - Boolean, make plots summarizing distances; default 0
 %     outdir    - directory to save plots and data; default ../analysis/baseline_gex_distance
 %     savefiles - boolean, whether to write files or just return them; default 0
@@ -20,6 +22,7 @@ function [sim, excl] = compute_genex_sim(varargin)
 pnames = {'cells', ...
     'metric', ...
     'ccleds', ...
+    'gene_space',...
     'plot', ...
     'outdir', ...
     'savefiles', ...
@@ -27,6 +30,7 @@ pnames = {'cells', ...
 dflts = {{}, ...
     'euclidean', ...
     'rnaseq2015', ...
+    '',...
     0, ...
     '/cmap/projects/cell_line_diversity/analysis/baseline_gex_distance', ...
     0, ...
@@ -56,13 +60,18 @@ function [ds, annot, excl] = get_gex_data(args)
     case 'rnaseq'
       ds = parse_gctx(fullfile(datapath, 'ccle_rnaseq_rpkm_n932x23686.gctx'));
     case 'rnaseq2015'
-      ds = parse_gctx(fullfile(trainingpath, 'CCLE_BASELINE_RNASEQ_L1KFULL_RPKM_LOG2_n1022x12450.gctx'));
+      ds = parse_gctx(fullfile(trainingpath, 'CCLE_BASELINE_RNASEQ_L1KFULL_RPKM_LOG2_LABELED_n1022x12450.gctx'));
     case 'affy'
       ds = parse_gctx(fullfile(datapath, 'cline_gene_n1515x12716.gctx'));
     case 'affyzs'
       ds = parse_gctx(fullfile(datapath, 'cline_gene_zs_n1515x12716.gctx'));
   end
 
+  %Gene filter
+  gene_space = get_array_input(args.gene_space,ds.rid);
+  ds = ds_slice(ds,'rid',gene_space,...
+      'ignore_missing',true);
+  
   cix = ifelse(isempty(args.cells), 1:numel(ds.cid), find(ismember(ds.cid, args.cells)));
   cset = ds.cid(cix);
   ds = gctsubset(ds, 'csubset', cix);
@@ -94,6 +103,12 @@ function ret = calc_gex_sim(ds, args)
 %       amag = diag(diag(sqrt(ds.mat' * ds.mat)));
 %       sim = 1 - amag \ ds.mat' * ds.mat / amag;
         sim = squareform(pdist(ds.mat', 'cosine'));
+    
+    case 'spearman'
+        sim = 1 - fastcorr(ds.mat, 'type', 'spearman');
+        
+    case 'pearson'
+        sim = 1 - fastcorr(ds.mat, 'type', 'pearson'); 
   end
 
   ret = mkgctstruct(sim, 'rid', ds.cid, 'cid', ds.cid, 'rdesc', ds.cdesc, 'cdesc', ds.cdesc, 'chd', ds.chd, 'rhd', ds.chd);
