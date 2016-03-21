@@ -3,6 +3,18 @@ function [xformcorrs,xform,x2] = xform_corr_diversity(corrs,null0,xform_method,p
 %
 %Given a null distribution of correlations and a set of observations,
 %computes the strength of the observations relative to the null.
+%
+%Input
+%       corrs: The correlations on which to compute contribututions
+%       null0: The null correlations to use as a background
+%       xform_method: Whether to use the cdf of pdf of the background to
+%              compute contributions. Default is 'cdf'. 'pdf' is not
+%              recommended
+%
+%Output
+%       xformcorrs: The transformed correlations
+%       xform: transform function output values
+%       x2: transform function input values
 
 [xform,x2] = compute_xform(null0,xform_method,pdf_estimate_method);    
 xformcorrs = interp1(x2,xform,corrs);
@@ -57,7 +69,7 @@ switch xform_method
         x2 = linspace(-1,1,numpoints);
         xform = zeros(1,numpoints);
         xform(x2 < med0) = 1;
-        xform(x2 >= med0 & x2 <= max0) = interp1(x,f,x2(x2 >= med0 & x2 <= max0));
+        xform(x2 >= med0 & x2 <= max0) = interp1(x,f,x2(x2 >= med0 & x2 <= max0),'linear','extrap');
         xform(x2 > max0) = 0;
 end
 

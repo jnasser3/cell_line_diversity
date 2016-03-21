@@ -91,7 +91,10 @@ for ii = 1:numel(cell_lines)
 
     for jj = (ii+1):numel(cell_lines)
         ds2 = subset_ds(ds,'cell_id',cell_lines(jj));
-        pdi.mat(ii,jj) = compute_diversity_index_two(ds1,ds2,args);
+        this_pdi = compute_diversity_index_two(ds1,ds2,args);
+        
+        assert(~isnan(this_pdi),'Pairwise diversity evaluated to NaN')
+        pdi.mat(ii,jj) = this_pdi;
     end
 end
 
