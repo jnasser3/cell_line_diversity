@@ -1,3 +1,9 @@
+ccle = parse_gctx('/cmap/projects/cell_line_diversity/data/CCLE_BASELINE_RNASEQ_L1KFULL_RPKM_LOG2_LABELED_n1022x12450.gctx');
+
+%% Subset to lm genes
+% lm = mortar.common.Spaces.probe('lm').asCell;
+% ccle = ds_slice(ccle, 'rid', lm, 'ignore_missing', true)
+
 %% Get PCs of CCLE baseline expression
 gex_tr = transpose_gct(ccle);
 [~, pc_score] = pca(gex_tr.mat);
@@ -20,7 +26,7 @@ feat = ds_slice(gex_pca,'ridx',1:k);
 % [fstat, pval, null0] = mdmr(ccle_cosine,rand_struct,'nperms',100)
 
 %% Test regression of cpc006 pdi on the PCs
-[fstat2, pval2, ~] = mdmr(cpc006_pdi,feat)
+[fstat2, pval2, ~] = mdmr(cpc006_pdi,feat);
 
 %% Test regression of core_ts pdi on the PCs
 % [fstat3, pval3, ~] = mdmr(core_ts_pdi,feat)

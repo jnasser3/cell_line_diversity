@@ -107,7 +107,7 @@ switch args.method
 %         end   
 end
 
-%Plotting
+%% Plotting
 if args.make_plot
     figure;
     scatter(ds1_vec,ds2_vec, 250, '.')
@@ -131,28 +131,30 @@ if args.make_plot
 end
 
 if args.make_dist_graph
-    mk_tsne_d(ds1,args.perplexity,inputname(1));
-    mk_tsne_d(ds2,args.perplexity,inputname(2));
-    mk_mds(ds1,inputname(1));
-    mk_mds(ds2,inputname(2));
+    mk_tsne_d(ds1,inputname(1),args);
+    mk_tsne_d(ds2,inputname(2),args);
+    mk_mds(ds1,inputname(1),args);
+    mk_mds(ds2,inputname(2),args);
 end
 
 end
 
-function mk_tsne_d(ds,perplexity,ds_name)
+function mk_tsne_d(ds,ds_name,args)
 
-mapped = tsne_d(ds.mat,[],2,perplexity);
+mapped = tsne_d(ds.mat,[],2,args.perplexity);
 
 figure;
 scatter(mapped(:,1),mapped(:,2))
 hold on
 grid on
-text(mapped(:,1),mapped(:,2),ds.rid)
+if args.show_label
+    text(mapped(:,1),mapped(:,2),ds.rid)
+end
 title(sprintf('tSNE - %s',ds_name),...
     'interpreter','none')
 end
 
-function mk_mds(ds,ds_name)
+function mk_mds(ds,ds_name,args)
 
 mapped = cmdscale(double(ds.mat),2);
 
@@ -160,7 +162,9 @@ figure;
 scatter(mapped(:,1),mapped(:,2))
 hold on
 grid on
-text(mapped(:,1),mapped(:,2),ds.rid)
+if args.show_label
+    text(mapped(:,1),mapped(:,2),ds.rid)
+end
 title(sprintf('MDS - %s',ds_name),...
     'interpreter','none')
 end

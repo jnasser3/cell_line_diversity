@@ -10,7 +10,7 @@ ccle = parse_gctx('/cmap/projects/cell_line_diversity/data/CCLE_BASELINE_RNASEQ_
 % of the covaraince matrix. C must be diagonal in this case since the
 % results of the PCA ensure we have orthogonal features.
 num_pcs = 10;
-num_samples = 100;
+num_samples = 1000;
 
 test_mat = ccle.mat(:,1:num_samples);
 
