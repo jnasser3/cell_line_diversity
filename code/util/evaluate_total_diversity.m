@@ -6,6 +6,10 @@ function evaluate_total_diversity(ds, lines, varargin )
 %
 % Input
 %       ds: A square struct of pairwise distances
+%       objective: The objective function to evaluate. Options are divr
+%           (sum of distances among chosen lines) or repr (sum of minimum
+%           distances from all lines to nearest chosen line. repr is optimized
+%           by affinity propogation. Default is 'repr'
 %       exclude: A set of id's to remove from the analysis
 %       lines: The set of objects to evaluate
 %       fixed_lines: A subset of objects to include in the calculation but
@@ -14,9 +18,11 @@ function evaluate_total_diversity(ds, lines, varargin )
 %
 
 params = {'fixed_lines',...
+    'objective',...
     'exclude',...
     'nperms'};
 dflts = {'',...
+    'repr',...
     '',...
     1000};
 args = parse_args(params,dflts,varargin{:});
@@ -36,7 +42,12 @@ lines = get_array_input(lines,'');
 lines_idx = find(ismember(ds.rid,lines));
 
 %compute the objective
-total_diversity = compute_total_diversity(ds,[lines_idx; fixed_lines_idx]);
+switch lower(args.objective)
+    case 'divr'
+        test_statistic = compute_total_diversity(ds,[lines_idx; fixed_lines_idx]);
+    case 'repr'
+        test_statistic = evaluate_pmedian_loss(ds, [lines fixed_lines]);
+end
 
 %compute a background
 n = numel(setdiff(ds.rid,fixed_lines));
@@ -45,18 +56,29 @@ bkg = zeros(1,args.nperms);
 for ii = 1:args.nperms
     temp = randperm(n,k);
     this_lines_idx = non_fixed_idx(temp);
-    bkg(ii) = compute_total_diversity(ds,[this_lines_idx; fixed_lines_idx]);  
+    this_lines = ds.rid(this_lines_idx);
+    
+    switch lower(args.objective)
+        case 'divr'
+            bkg(ii) = compute_total_diversity(ds,[this_lines_idx; fixed_lines_idx]);  
+        case 'repr'
+            bkg(ii) = evaluate_pmedian_loss(ds, [this_lines fixed_lines]);
+    end
 end
 
 %plot
 figure;
 histogram(bkg,'DisplayName','Background')
 hold on
-vline(total_diversity,'r-');
+vline(test_statistic,'r-');
 xlabel('Sum of pairwise distances')
 ylabel('Frequency')
-pct = sum(total_diversity > bkg)/numel(bkg);
-title_str = sprintf('Diversity objective with respect to background. Percentile rank is: %.2f', pct);
+pct = sum(test_statistic > bkg)/numel(bkg);
+title_str = sprintf(['Objective with respect to random background\n',...
+    'Objective type is: %s\n',...
+    'nperms = %d\n',...
+    'Percentile rank = %.3f'],...
+    args.objective,args.nperms,pct);
 title(title_str)
 grid on
 
