@@ -12,6 +12,9 @@ function [exemplars,membership] = run_apcluster(ds,varargin)
 %       ds: an n x n struct of pairwise distances
 %       exclude: a cell array or .grp of objects to exclude. Default ''
 %       known: a cell array or .grp of known exemplars. Default ''
+%       pref_quantile: A number in [0,1]. Controls the preferences. Lower
+%               means more exemplars. Eg: 0 means all points are exemplars. 
+%               1 means only a single exemplar is chosen. Default .01
 %       verbose: Print logging to screen. Default true
 %
 %Outputs:
@@ -20,9 +23,11 @@ function [exemplars,membership] = run_apcluster(ds,varargin)
 
 params = {'exclude',...
           'known',...
+          'pref_quantile',...
           'verbose'};
 dflts = {'',...
     '',...
+    .01,...
     true};
 args = parse_args(params,dflts,varargin{:});
 
@@ -35,12 +40,10 @@ if ~isempty(exclude)
     ds = ds_slice(ds,'cid',objects,'rid',objects);
 end
 
-ds
-
 %Set preferences vector
-w = -1*mean([median(tri2vec(ds.mat)) max(tri2vec(ds.mat))])
+% w = -1*mean([median(tri2vec(ds.mat)) max(tri2vec(ds.mat))]);
 known = get_array_input(args.known,'');
-preferences = mk_known_pref(ds.rid,known,w)
+preferences = mk_known_pref(-1*ds.mat,ds.rid,known,args.pref_quantile);
 
 %Run the clustering algo. Note that apcluster requires a similarity matrix,
 %so change the sign on the distance matrix
@@ -53,15 +56,18 @@ membership = ds.rid(idx);
 end
 
 
-function wt = mk_known_pref(objects,known,w)
+function pref = mk_known_pref(sim,objects,known,t)
 %Given a subset of the objects which are known landmarks, returns a weight
 %vector promoting the inclusion of these landmarks. %
 %
-%Known objects objects get a 'preference' of 0, unkown objects get a
+%Known objects objects get a 'preference' of 1, unkown objects get a
 %preference of w (which should be < 0).
-
 n = numel(objects);
-wt = w*ones(n,1);
+
+[pref_min, pref_max] = preferenceRange(sim)
+const = t*pref_min + (1-t)*pref_max
+
+pref = const*ones(n,1);
 lm_idx = ismember(objects,known);
-wt(lm_idx) = 1;
+pref(lm_idx) = 1;
 end
