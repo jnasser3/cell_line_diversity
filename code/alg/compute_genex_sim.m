@@ -20,6 +20,7 @@ function [sim, excl] = compute_genex_sim(varargin)
 %     outdir    - directory to save plots and data; default ../analysis/baseline_gex_distance
 %     savefiles - boolean, whether to write files or just return them; default 0
 %     norm      - normalize the stdev of all genes to 1. 
+%     norm_type - Use standard deviation or MAD. Default std.
 
 pnames = {'cells', ...
     'metric', ...
@@ -29,7 +30,8 @@ pnames = {'cells', ...
     'plot', ...
     'outdir', ...
     'savefiles', ...
-    'norm'};
+    'norm',...
+    'norm_type'};
 dflts = {{}, ...
     'euclidean', ...
     30,...
@@ -38,13 +40,14 @@ dflts = {{}, ...
     0, ...
     '/cmap/projects/cell_line_diversity/analysis/baseline_gex_distance', ...
     0, ...
-    1};
+    1,...
+    'std'};
 args = parse_args(pnames, dflts, varargin{:});
 
 
 [ds, annot, excl] = get_gex_data(args);
 if args.norm
-  ds = norm_data(ds);
+  ds = norm_data(ds,args);
 end
 
 sim = calc_gex_sim(ds, args);
@@ -83,8 +86,13 @@ function [ds, annot, excl] = get_gex_data(args)
   annot = parse_tbl(fullfile(datapath, 'clinedb.txt'));
 end
 
-function ds = norm_data(ds)
-    s = std(ds.mat, 0, 2);
+function ds = norm_data(ds,args)
+    switch args.norm_type
+        case 'std'
+            s = std(ds.mat, 0, 2);
+        case 'mad'
+            s = mad(ds.mat, 0, 2);
+    end
     s(s == 0) = 1;
     ds.mat = ds.mat./repmat(s, 1, numel(ds.cid));
 end

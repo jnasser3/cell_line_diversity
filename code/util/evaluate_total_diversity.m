@@ -1,4 +1,5 @@
 function evaluate_total_diversity(ds, lines, varargin )
+% evaluate_total_diversity(ds, lines, varargin )
 %
 % Start with a universe of objects and pairwise distances between them.
 % Given a subset of these objects, computes the sum of their  mutual 
@@ -6,12 +7,12 @@ function evaluate_total_diversity(ds, lines, varargin )
 %
 % Input
 %       ds: A square struct of pairwise distances
+%       lines: The set of objects to evaluate
 %       objective: The objective function to evaluate. Options are divr
 %           (sum of distances among chosen lines) or repr (sum of minimum
 %           distances from all lines to nearest chosen line. repr is optimized
 %           by affinity propogation. Default is 'repr'
 %       exclude: A set of id's to remove from the analysis
-%       lines: The set of objects to evaluate
 %       fixed_lines: A subset of objects to include in the calculation but
 %                   not to evaluate
 %       nperms: Number of permutations to compare against. Default 1000
@@ -46,7 +47,7 @@ switch lower(args.objective)
     case 'divr'
         test_statistic = compute_total_diversity(ds,[lines_idx; fixed_lines_idx]);
     case 'repr'
-        test_statistic = evaluate_pmedian_loss(ds, [lines fixed_lines]);
+        test_statistic = evaluate_pmedian_loss(ds, [lines; fixed_lines]);
 end
 
 %compute a background
@@ -62,25 +63,28 @@ for ii = 1:args.nperms
         case 'divr'
             bkg(ii) = compute_total_diversity(ds,[this_lines_idx; fixed_lines_idx]);  
         case 'repr'
-            bkg(ii) = evaluate_pmedian_loss(ds, [this_lines fixed_lines]);
+            bkg(ii) = evaluate_pmedian_loss(ds, [this_lines; fixed_lines]);
     end
 end
 
 %plot
 figure;
-histogram(bkg,'DisplayName','Background')
+histogram(bkg,'DisplayName','Background');
 hold on
-vline(test_statistic,'r-');
+g = gca;
+plot([test_statistic test_statistic], g.YLim, 'DisplayName', 'Test Statistic')
 xlabel('Sum of pairwise distances')
-ylabel('Frequency')
 pct = sum(test_statistic > bkg)/numel(bkg);
 title_str = sprintf(['Objective with respect to random background\n',...
+    'Evaluting lines: %s\n',...
     'Objective type is: %s\n',...
+    'Objective = %.2f\n',...
     'nperms = %d\n',...
     'Percentile rank = %.3f'],...
-    args.objective,args.nperms,pct);
-title(title_str)
+    inputname(2),args.objective,test_statistic,args.nperms,pct);
+title(title_str,'Interpreter','none')
 grid on
+legend show
 
 end
 

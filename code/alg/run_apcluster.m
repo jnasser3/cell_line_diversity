@@ -10,8 +10,11 @@ function [exemplars,membership] = run_apcluster(ds,varargin)
 %
 %Inputs:
 %       ds: an n x n struct of pairwise distances
-%       exclude: a cell array or .grp of objects to exclude. Default ''
-%       known: a cell array or .grp of known exemplars. Default ''
+%       include: a cell array or .grp of objects to include in the
+%                consideration. Default all in ds.
+%       exclude: a cell array or .grp of objects to exclude from consideration. Default ''
+%       known: a cell array or .grp of known exemplars to cluster around. Default ''
+%       candidate: a cell array or .grp of candidate exemplars.
 %       pref_quantile: A number in [0,1]. Controls the preferences. Lower
 %               means more exemplars. Eg: 0 means all points are exemplars. 
 %               1 means only a single exemplar is chosen. Default .01
@@ -22,10 +25,14 @@ function [exemplars,membership] = run_apcluster(ds,varargin)
 %       membership: Exemplar cluster membership
 
 params = {'exclude',...
+          'include',...
           'known',...
+          'candidate',...
           'pref_quantile',...
           'verbose'};
 dflts = {'',...
+    '',...
+    '',...
     '',...
     .01,...
     true};
@@ -40,14 +47,24 @@ if ~isempty(exclude)
     ds = ds_slice(ds,'cid',objects,'rid',objects);
 end
 
+%Subset ds if needed
+include = get_array_input(args.include,ds.cid);
+include = intersect(include,ds.cid);
+ds = ds_slice(ds,'cid',include,'rid',include,'ingore_missing',true);
+
 %Set preferences vector
 % w = -1*mean([median(tri2vec(ds.mat)) max(tri2vec(ds.mat))]);
 known = get_array_input(args.known,'');
-preferences = mk_known_pref(-1*ds.mat,ds.rid,known,args.pref_quantile);
+candidate = get_array_input(args.candidate,'');
+preferences = mk_known_pref(-1*ds.mat,...
+    ds.rid,...
+    known,...
+    candidate,...
+    args.pref_quantile);
 
 %Run the clustering algo. Note that apcluster requires a similarity matrix,
 %so change the sign on the distance matrix
-[idx, netsim, dpsim, expref] = apcluster(-1*ds.mat,preferences);
+[idx, ~, ~, ~] = apcluster(-1*ds.mat,preferences);
 
 exemplar_idx = unique(idx);
 exemplars = ds.rid(exemplar_idx);
@@ -55,19 +72,22 @@ membership = ds.rid(idx);
 
 end
 
-
-function pref = mk_known_pref(sim,objects,known,t)
+function pref = mk_known_pref(sim,objects,known,candidate,t)
 %Given a subset of the objects which are known landmarks, returns a weight
 %vector promoting the inclusion of these landmarks. %
 %
 %Known objects objects get a 'preference' of 1, unkown objects get a
-%preference of w (which should be < 0).
+%preference controlling the total number of exemplars apcluster chooses.
 n = numel(objects);
 
-[pref_min, pref_max] = preferenceRange(sim)
-const = t*pref_min + (1-t)*pref_max
+[pref_min, pref_max] = preferenceRange(sim);
+const = t*pref_min + (1-t)*pref_max;
 
-pref = const*ones(n,1);
-lm_idx = ismember(objects,known);
-pref(lm_idx) = 1;
+pref = 2*const*ones(n,1);
+
+known_idx = ismember(objects,known);
+pref(known_idx) = 10;
+
+candidate_idx = ismember(objects,candidate);
+pref(candidate_idx) = const;
 end
