@@ -99,7 +99,8 @@ pwcorrs = pwcorr(ds1.mat,ds2.mat);
 
 %compute diversity index
 num_perts = size(ds1.mat,2);
-DI = sum(bioa .* (1 - pwcorrs)) / num_perts;
+%DI = sum(bioa .* (1 - pwcorrs)) / num_perts;
+DI = bioa .* (1 - pwcorrs);
 
 if args.make_plot
     if args.show_plot
@@ -200,15 +201,16 @@ function h = mk_di_scatter2(bioa,corrs,DI_contribution,DI,cell1,cell2,args)
         '_',cell2,...
         '_scatter2');
     namefig(h,name);
-    scatter(bioa,corrs,[],DI_contribution)
-    axis([0 1 -1 1])
-    colormap(cool)
-    c = colorbar;
-    c.Label.String = 'Contribution to Diversity';
-    caxis([0, 1])
+%    scatter(bioa,corrs,[],DI_contribution)
+    scatter(corrs,bioa,[],'k')
+    axis([-1 1 0 1])
+%     colormap(cool)
+%     c = colorbar;
+%     c.Label.String = 'Contribution to Diversity';
+%     caxis([0, 1])
     grid on
-    xlabel('Maximum Replicate Reproducibility')
-    ylabel('Correlation')
+    ylabel('Maximum Replicate Reproducibility')
+    xlabel('Correlation')
     title_str = sprintf(['Reproducibility vs correlation for signatures in %s and %s \n',...
         'Number of signatures = %d \n',...
         'Correlation type: %s \n',...
@@ -277,7 +279,7 @@ function h = mk_corr_plot(all_corrs,cell1,cell2,args)
     
     [fnull, xnull] = ksdensity(tri2vec(all_corrs));
     [fmatch, xmatch] = ksdensity(diag(all_corrs));
-    plot(xnull,fnull,'DisplayName','Null - unmatched pairs');
+    plot(xnull,fnull,'DisplayName','Background - unmatched pairs');
     hold on
     plot(xmatch,fmatch,'DisplayName','Matched pairs');
     title_str = sprintf(['Correlation of signatures in %s and %s\n',...
@@ -290,7 +292,7 @@ function h = mk_corr_plot(all_corrs,cell1,cell2,args)
     grid on
     axis([-1 1 0 6])
     xlabel('Correlation')
-    ylabel('pdf')
+    ylabel('Density')
     legend('show')
     
     if args.save_plot
