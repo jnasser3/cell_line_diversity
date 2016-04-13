@@ -1,26 +1,11 @@
-function [DI,all_corrs] = compute_diversity_index_two(ds1, ds2, args)
+function DI = compute_diversity_index_two(ds1, ds2, args)
 %Given expression matrices for two cell lines, computes their diversity index.
-
-% pnames = {'metric',...
-%     'kde_method',...
-%     'make_plot',...
-%     'show_plot',...
-%     'save_plot',...
-%     'plot_dir'};
-% dflts = {'rel_bioa_corr',...
-%     'matlab',...
-%     false,...
-%     false,...
-%     false,...
-%     '/cmap/projects/cell_line_diversity/analysis/pairwise_diversity_index/core_ts/rel_bioa_corr/fig'};
-% args = parse_args(pnames, dflts, varargin{:});
 
 % Data validation
 assert(isequal(ds1.rid,ds2.rid), 'Gene space not the same')
 
-% Order the perts identically b/w ds1 and ds2
-[ds1,ds2] = order_data_sets(ds1, ds2);
-
+% Order the signatures identically b/w ds1 and ds2
+[ds1,ds2] = order_data_sets(ds1, ds2, 'pert_id_dose_time');
 assert(isequal(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')),...
     ds2.cdesc(:,ds2.cdict('pert_id_dose_time'))), 'Sample space not ordered the same')
 
@@ -31,7 +16,7 @@ switch lower(args.metric)
     case 'basic_bioa_corr'
         DI = basic_bioa_corr(ds1,ds2,args);
     case 'rel_bioa_corr'
-        [DI, all_corrs] = rel_wtd_corr(ds1,ds2,ts_cp_ccq75,args);
+        DI = rel_wtd_corr(ds1,ds2,ts_cp_ccq75,args);
     case 'cov_fro'
         DI = covariance_frobenius(ds1,ds2);  
     case 'cov_eig'
@@ -39,16 +24,16 @@ end
 
 end
 
-function [ds1, ds2] = order_data_sets(ds1, ds2)
+function [ds1, ds2] = order_data_sets(ds1, ds2, field)
     %order data sets by pert_id_dose_time combo
-    ds1 = remove_duplicates(ds1,'pert_id_dose_time');
-    ds2 = remove_duplicates(ds2,'pert_id_dose_time');
-    [ds1, ds2] = subset_data_sets(ds1,ds2);
+    ds1 = remove_duplicates(ds1,field);
+    ds2 = remove_duplicates(ds2,field);
+    [ds1, ds2] = subset_data_sets(ds1, ds2, field);
 
     %Order both datasets alphabetically
     %[~,idx] = orderas(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')),ds2.cdesc(:,ds2.cdict('pert_id_dose_time')));
-    [~,idx1] = sort(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')));
-    [~,idx2] = sort(ds2.cdesc(:,ds2.cdict('pert_id_dose_time')));
+    [~,idx1] = sort(ds1.cdesc(:,ds1.cdict(field)));
+    [~,idx2] = sort(ds2.cdesc(:,ds2.cdict(field)));
     
     ds1.cdesc = ds1.cdesc(idx1,:);
     ds1.mat = ds1.mat(:,idx1);
@@ -57,11 +42,11 @@ function [ds1, ds2] = order_data_sets(ds1, ds2)
     ds2.mat = ds2.mat(:,idx2);
 end
 
-function [ds1, ds2] = subset_data_sets(ds1, ds2)
+function [ds1, ds2] = subset_data_sets(ds1, ds2, field)
     %subset data sets to common combos
-    common_combos = intersect(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')), ds2.cdesc(:,ds2.cdict('pert_id_dose_time')));
-    idx1 = ismember(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')),common_combos);
-    idx2 = ismember(ds2.cdesc(:,ds2.cdict('pert_id_dose_time')),common_combos);
+    common_combos = intersect(ds1.cdesc(:,ds1.cdict(field)), ds2.cdesc(:,ds2.cdict(field)));
+    idx1 = ismember(ds1.cdesc(:,ds1.cdict(field)),common_combos);
+    idx2 = ismember(ds2.cdesc(:,ds2.cdict(field)),common_combos);
     ds1 = ds_slice(ds1, 'cidx', find(idx1));
     ds2 = ds_slice(ds2, 'cidx', find(idx2));
 end
@@ -144,12 +129,20 @@ end
 
 function [DI, all_corrs] = rel_wtd_corr(ds1,ds2,bioa_bkg,args)
 
-%get corr contributions
-all_corrs = fastcorr(ds1.mat,ds2.mat,...
-    'type',args.corr_type);
-[matched_corrs, unmatched_corrs] = mat2vec_diag(all_corrs);
-corr_contribution = xform_corr_diversity(matched_corrs,unmatched_corrs,...
-    'cdf',args.kde_method);
+%get corr contributions. First either get global bkg or compute local bkg.
+switch args.corr_bkg_type
+    case 'global'
+        matched_corrs = pwcorr(ds1.mat,ds2.mat);
+        corr_contribution = interp1(args.corr_mesh,args.corr_xform,matched_corrs);
+         
+    case 'local'
+        all_corrs = fastcorr(ds1.mat,ds2.mat,...
+            'type',args.corr_type);
+        [matched_corrs, unmatched_corrs] = mat2vec_diag(all_corrs);
+        corr_contribution = xform_corr_diversity(matched_corrs,unmatched_corrs,...
+            'cdf',args.kde_method);
+end
+
 
 %get bioactiviy cdfs and convert to cdf contributions
 bioa1 = cell2mat(ds1.cdesc(:,ds1.cdict('distil_cc_q75')));
@@ -167,7 +160,7 @@ if args.make_plot
     cell2 = ds2.cdesc{1,ds2.cdict('cell_id')};
 
     mk_di_scatter2(max([bioa1, bioa2], [], 2),...
-        diag(all_corrs),...
+        matched_corrs,...
         corr_contribution .* bioa_contribution,...
         DI,...
         cell1,...
@@ -183,10 +176,10 @@ if args.make_plot
 %         cell2,...
 %         args);
     
-    mk_corr_plot(all_corrs,...
-        cell1,...
-        cell2,...
-        args);
+%     mk_corr_plot(all_corrs,...
+%         cell1,...
+%         cell2,...
+%         args);
 
 end
 end
