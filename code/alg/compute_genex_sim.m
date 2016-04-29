@@ -11,8 +11,8 @@ function [sim, excl] = compute_genex_sim(varargin)
 % Parameters:
 %     cells     - A cell array of cell lines.  If empty (default), computes on all available cell lines
 %     metric    - string; the distance function.  Supported: 'euclidean' (default), 'cosine' (distance: 1-cosine)
-%     mahal_num_pcs - Dimension of PCA to perform when using mahalanobis
-%           distance. Default 30
+%     num_pcs - Dimension of PCA to perform before computing distances.
+%               Only supports Euclidean and mahalanbois distance. Default 30          
 %     ccleds    - string, which determines which ccleds to use.  Supported: rnaseq (default)
 %     gene_space - .grp file or cell array. Space of genes in which to
 %                  compute distances. Default is all genes in the ds.
@@ -20,11 +20,11 @@ function [sim, excl] = compute_genex_sim(varargin)
 %     outdir    - directory to save plots and data; default ../analysis/baseline_gex_distance
 %     savefiles - boolean, whether to write files or just return them; default 0
 %     norm      - normalize the stdev of all genes to 1. 
-%     norm_type - Use standard deviation or MAD. Default std.
+%     norm_type - Use standard deviation or mad. Default std.
 
 pnames = {'cells', ...
     'metric', ...
-    'mahal_num_pcs',...
+    'num_pcs',...
     'ccleds', ...
     'gene_space',...
     'plot', ...
@@ -35,7 +35,7 @@ pnames = {'cells', ...
 dflts = {{}, ...
     'euclidean', ...
     30,...
-    'rnaseq2015', ...
+    'rnaseq_protein_coding', ...
     '',...
     0, ...
     '/cmap/projects/cell_line_diversity/analysis/baseline_gex_distance', ...
@@ -68,6 +68,8 @@ function [ds, annot, excl] = get_gex_data(args)
       ds = parse_gctx(fullfile(datapath, 'ccle_rnaseq_rpkm_n932x23686.gctx'));
     case 'rnaseq2015'
       ds = parse_gctx(fullfile(trainingpath, 'CCLE_BASELINE_RNASEQ_L1KFULL_RPKM_LOG2_LABELED_n1022x12450.gctx'));
+    case 'rnaseq_protein_coding'
+      ds = parse_gctx(fullfile(trainingpath, '/rnaseq/CCLE_BASELINE_RNASEQ_PROTEIN_CODING_RPKM_LOG2_LABELED_n1022x18772.gctx'));
     case 'affy'
       ds = parse_gctx(fullfile(datapath, 'cline_gene_n1515x12716.gctx'));
     case 'affyzs'
@@ -75,9 +77,9 @@ function [ds, annot, excl] = get_gex_data(args)
   end
 
   %Gene filter
-  gene_space = get_array_input(args.gene_space,ds.rid);
-  ds = ds_slice(ds,'rid',gene_space,...
-      'ignore_missing',true);
+  %gene_space = get_array_input(args.gene_space,ds.rid);
+  %ds = ds_slice(ds,'rid',gene_space,...
+  %    'ignore_missing',true);
   
   cix = ifelse(isempty(args.cells), 1:numel(ds.cid), find(ismember(ds.cid, args.cells)));
   cset = ds.cid(cix);
@@ -100,12 +102,15 @@ end
 function ret = calc_gex_sim(ds, args)
   switch lower(args.metric)
     case 'euclidean'
-        sim = squareform(pdist(ds.mat', 'euclidean')); 
+        data = ds.mat';
+        [~, pca_data] = pca(data);
+        pca_data = pca_data(:,1:args.num_pcs);
+        sim = squareform(pdist(pca_data, 'euclidean')); 
     
     case 'mahal'
         data = ds.mat';
         [~, pca_data] = pca(data);
-        pca_data = pca_data(:,1:args.mahal_num_pcs);
+        pca_data = pca_data(:,1:args.num_pcs);
         sim = squareform(pdist(pca_data, 'mahalanobis'));
         
     case 'seuclidean'
