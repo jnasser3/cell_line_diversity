@@ -2,12 +2,15 @@ function evaluate_total_diversity(ds, lines, varargin )
 % evaluate_total_diversity(ds, lines, varargin )
 %
 % Start with a universe of objects and pairwise distances between them.
-% Given a subset of these objects, computes the sum of their  mutual 
+% Given a subset of these objects, computes the sum of their mutual 
 % pairwise distances and compares this to random choices.
 %
 % Input
 %       ds: A square struct of pairwise distances
-%       lines: The set of objects to evaluate
+%       include: The set of lines to include in the analysis
+%       lines: An array of cell arrays. Each array contains a set of lines to evaluate.
+%           Each array must have the same number of elements.
+%       lines_labels: An array of labels for lines for plotting purposes.
 %       objective: The objective function to evaluate. Options are divr
 %           (sum of distances among chosen lines) or repr (sum of minimum
 %           distances from all lines to nearest chosen line. repr is optimized
@@ -16,17 +19,25 @@ function evaluate_total_diversity(ds, lines, varargin )
 %       fixed_lines: A subset of objects to include in the calculation but
 %                   not to evaluate
 %       nperms: Number of permutations to compare against. Default 1000
-%
 
-params = {'fixed_lines',...
+params = {'include',...
+    'fixed_lines',...
     'objective',...
     'exclude',...
+    'lines_labels',...
     'nperms'};
 dflts = {'',...
+    '',...
     'repr',...
+    '',...
     '',...
     1000};
 args = parse_args(params,dflts,varargin{:});
+
+%Make sure all arrays in lines have the same number of elements.
+sizes = cellfun('length',lines);
+assert(range(sizes) == 0, 'All arrays must have the same number of elements');
+assert(length(lines) == length(args.lines_labels), 'Must have same number of lines and labels')
 
 %Subset ds if needed
 exclude = get_array_input(args.exclude,'');
@@ -35,33 +46,38 @@ if ~isempty(exclude)
     ds = ds_slice(ds,'cid',objects,'rid',objects);
 end
 
-%get cell line indices
-fixed_lines = get_array_input(args.fixed_lines,'');
-fixed_lines_idx = find(ismember(ds.rid,fixed_lines));
-non_fixed_idx = find(~ismember(ds.rid,fixed_lines));
-lines = get_array_input(lines,'');
-lines_idx = find(ismember(ds.rid,lines));
+%Subset ds if needed
+include = get_array_input(args.include,ds.cid);
+include = intersect(include,ds.cid);
+ds = ds_slice(ds,'cid',include,'rid',include,'ingore_missing',true);
 
-%compute the objective
-switch lower(args.objective)
-    case 'divr'
-        test_statistic = compute_total_diversity(ds,[lines_idx; fixed_lines_idx]);
-    case 'repr'
-        test_statistic = evaluate_pmedian_loss(ds, [lines; fixed_lines]);
+%get fixed cell lines
+fixed_lines = get_array_input(args.fixed_lines,'');
+non_fixed_lines = setdiff(ds.rid,fixed_lines);
+
+%compute the objectives
+test_statistic = zeros(1,length(lines));
+for ii = 1:length(lines)
+    this_lines = get_array_input(lines{ii},'');
+    switch lower(args.objective)
+        case 'divr'
+                test_statistic(ii) = compute_total_diversity(ds,[this_lines; fixed_lines]);
+        case 'repr'
+                test_statistic(ii) = evaluate_pmedian_loss(ds, [this_lines; fixed_lines]);
+    end
 end
 
 %compute a background
 n = numel(setdiff(ds.rid,fixed_lines));
-k = numel(lines);
+k = numel(lines{1});
 bkg = zeros(1,args.nperms);
 for ii = 1:args.nperms
     temp = randperm(n,k);
-    this_lines_idx = non_fixed_idx(temp);
-    this_lines = ds.rid(this_lines_idx);
-    
+    this_lines = non_fixed_lines(temp);
+
     switch lower(args.objective)
         case 'divr'
-            bkg(ii) = compute_total_diversity(ds,[this_lines_idx; fixed_lines_idx]);  
+            bkg(ii) = compute_total_diversity(ds,[this_lines; fixed_lines]);  
         case 'repr'
             bkg(ii) = evaluate_pmedian_loss(ds, [this_lines; fixed_lines]);
     end
@@ -72,25 +88,35 @@ figure;
 histogram(bkg,'DisplayName','Background');
 hold on
 g = gca;
-plot([test_statistic test_statistic], g.YLim, 'DisplayName', 'Test Statistic')
-xlabel('Sum of pairwise distances')
-pct = sum(test_statistic > bkg)/numel(bkg);
+for ii = 1:length(lines)
+    plot([test_statistic(ii) test_statistic(ii)], g.YLim,...
+        'DisplayName', args.lines_labels{ii},...
+        'LineWidth',2)
+    hold on
+end
+xlabel('Objective')
+ylabel('Frequency')
 title_str = sprintf(['Objective with respect to random background\n',...
-    'Evaluting lines: %s\n',...
+    'Num Exemplar: %d\n',...
     'Objective type is: %s\n',...
-    'Objective = %.2f\n',...
-    'nperms = %d\n',...
-    'Percentile rank = %.3f'],...
-    inputname(2),args.objective,test_statistic,args.nperms,pct);
+    'nperms = %d\n'],...
+    numel([lines{1}; fixed_lines]),args.objective,args.nperms);
 title(title_str,'Interpreter','none')
 grid on
-legend show
+legend('show')
+leg = legend;
+set(leg, 'Interpreter', 'None')
 
 end
 
-function d = compute_total_diversity(ds, idx)
+function d = compute_total_diversity(ds, lines)
 %Computes the sum of pairwise distances between objects
 
+idx = ismember(ds.rid,lines);
 d = sum(tri2vec(ds.mat(idx,idx)));
 
+%Average for easier interpretation
+d = d / nchoosek(nnz(idx),2);
+
 end
+

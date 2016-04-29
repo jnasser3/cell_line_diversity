@@ -8,6 +8,9 @@ function loss = evaluate_pmedian_loss(ds,exemplar)
 exemplar_idx = ismember(ds.rid,exemplar);
 loss = sum(min(ds.mat(:,exemplar_idx),[],2));
 
+%Average loss for easier interpretation
+loss = loss / numel(ds.rid);
+
 % %Slow version of the vectorized code
 % for ii = 1:numel(ds.rid);
 %     loss = loss + min(ds.mat(ii,exemplar_idx));
