@@ -1,4 +1,6 @@
 function [diag_elements, off_diag] = mat2vec_diag(X)
+%[diag_elements, off_diag] = mat2vec_diag(X)
+%
 %Decomposes a square matrix into it's diagonal and off diagonal elements
 %
 %Note that if X is symmetric, the upper and lower triangles of X are the

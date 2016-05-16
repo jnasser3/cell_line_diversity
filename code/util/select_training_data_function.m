@@ -16,6 +16,9 @@ function out_ds = select_training_data_function(ds,varargin)
 %Outputs
 %       out_ds: a genes x sample struct containing one a unique (in terms
 %               of match_field) signature per cell line.
+%
+%To match uniquely with multiple fields, ie a concatenation of fields,
+%combine this function with annotate_ds_concatenated_field.
 
 params = {'cell_lines',...
           'match_field',...
@@ -26,9 +29,12 @@ dflts = {'',...
 args = parse_args(params,dflts,varargin{:});
 
 cell_lines = get_array_input(args.cell_lines,unique(ds.cdesc(:,ds.cdict('cell_id'))));
+num_lines = numel(cell_lines);
 match_field = ds.cdesc(:,ds.cdict(args.match_field));
 
-num_lines = numel(cell_lines);
+%Subset to cell lines
+idx = ismember(ds.cdesc(:,ds.cdict('cell_id')),cell_lines);
+ds = ds_slice(ds,'cid',ds.cid(idx));
 
 %remove all signatures not having enough replicates
 good_rep_idx = find(cell2mat((ds.cdesc(:,ds.cdict('distil_nsample')))) >= args.min_rep);
@@ -42,16 +48,18 @@ good_T = T(good_idx,:);
 good_combo = good_T{:,1};
 
 %% For each combo check that it appears in 9 distinct lines
-great_combo = [];
+great_combo = good_combo;
 for ii = 1:numel(good_combo)
     idx = strcmp(ds.cdesc(:,ds.cdict(args.match_field)),good_combo(ii));
     lines = ds.cdesc(idx,ds.cdict('cell_id'));
-    pert_type = unique(ds.cdesc(idx,ds.cdict('pert_type')));
+    %pert_type = unique(ds.cdesc(idx,ds.cdict('pert_type')));
     
-    if numel(unique(lines)) >= num_lines %&& strcmp(pert_type,'trt_cp')
-        great_combo = [great_combo, good_combo(ii)];
+    if numel(unique(lines)) < num_lines %&& strcmp(pert_type,'trt_cp')
+        %great_combo = [great_combo, good_combo(ii)];
+        great_combo{ii} = 'TOREMOVE';
     end
 end
+great_combo(strcmp(great_combo,'TOREMOVE')) = [];
 great_idx = ismember(ds.cdesc(:,ds.cdict(args.match_field)),great_combo);
 
 %% For each great combo, only select one of it's signatures in each cell line
