@@ -1,13 +1,13 @@
-function DI = compute_diversity_index_two(ds1, ds2, args)
+function [DI, data_struct] = compute_diversity_index_two(ds1, ds2, args)
 %Given expression matrices for two cell lines, computes their diversity index.
 
 % Data validation
 assert(isequal(ds1.rid,ds2.rid), 'Gene space not the same')
 
 % Order the signatures identically b/w ds1 and ds2
-[ds1,ds2] = order_data_sets(ds1, ds2, 'pert_id_dose_time');
-assert(isequal(ds1.cdesc(:,ds1.cdict('pert_id_dose_time')),...
-    ds2.cdesc(:,ds2.cdict('pert_id_dose_time'))), 'Sample space not ordered the same')
+[ds1,ds2] = order_data_sets(ds1, ds2, args.prune_field);
+assert(isequal(ds1.cdesc(:,ds1.cdict(args.prune_field)),...
+    ds2.cdesc(:,ds2.cdict(args.prune_field))), 'Sample space not ordered the same')
 
 % Load bioactivity background
 load /cmap/projects/cell_line_diversity/data/ts_cp_ccq75.mat
@@ -16,7 +16,7 @@ switch lower(args.metric)
     case 'basic_bioa_corr'
         DI = basic_bioa_corr(ds1,ds2,args);
     case 'rel_bioa_corr'
-        DI = rel_wtd_corr(ds1,ds2,ts_cp_ccq75,args);
+        [DI,data_struct] = rel_wtd_corr(ds1,ds2,ts_cp_ccq75,args);
     case 'cov_fro'
         DI = covariance_frobenius(ds1,ds2);  
     case 'cov_eig'
@@ -127,7 +127,7 @@ cov2 = cov(ds2.mat');
 DI = norm(cov1 - cov2, 'fro');
 end
 
-function [DI, all_corrs] = rel_wtd_corr(ds1,ds2,bioa_bkg,args)
+function [DI, data_struct] = rel_wtd_corr(ds1,ds2,bioa_bkg,args)
 
 %get corr contributions. First either get global bkg or compute local bkg.
 switch args.corr_bkg_type
@@ -152,12 +152,21 @@ bioa2_rel = xform_bioa_diversity(bioa2, bioa_bkg);
 
 bioa_contribution = max([bioa1_rel, bioa2_rel], [], 2);
 DI = sum(corr_contribution .* bioa_contribution) / sum(bioa_contribution);
-sum(bioa_contribution);
+
+data_struct = struct('sig_id',ds1.cid,...
+    'pert_iname',ds1.cdesc(:,ds1.cdict('pert_iname')),...
+    'pert_idose',ds1.cdesc(:,ds1.cdict('pert_idose')),...
+    'pert_itime',ds1.cdesc(:,ds1.cdict('pert_itime')),...
+    'corr',matched_corrs,...
+    'cell1_cc_q75',bioa1,...
+    'cell2_cc_q75',bioa2);
 
 if args.make_plot
     
     cell1 = ds1.cdesc{1,ds1.cdict('cell_id')};
     cell2 = ds2.cdesc{1,ds2.cdict('cell_id')};
+    
+    num_unique_perts = numel(unique(ds1.cdesc(:,ds1.cdict('pert_id'))));
 
     mk_di_scatter2(max([bioa1, bioa2], [], 2),...
         matched_corrs,...
@@ -165,6 +174,7 @@ if args.make_plot
         DI,...
         cell1,...
         cell2,...
+        num_unique_perts,...
         args);
     
 %     mk_di_scatter3(bioa1,...
@@ -184,7 +194,7 @@ if args.make_plot
 end
 end
 
-function h = mk_di_scatter2(bioa,corrs,DI_contribution,DI,cell1,cell2,args)
+function h = mk_di_scatter2(bioa,corrs,DI_contribution,DI,cell1,cell2,nperts,args)
     if args.show_plot
         h = figure;
     else
@@ -206,11 +216,13 @@ function h = mk_di_scatter2(bioa,corrs,DI_contribution,DI,cell1,cell2,args)
     xlabel('Correlation')
     title_str = sprintf(['Reproducibility vs correlation for signatures in %s and %s \n',...
         'Number of signatures = %d \n',...
+        'Number of unique perturbagens = %d \n',...
         'Correlation type: %s \n',...
         'Diversity index = %.3f'],...
         cell1,...
         cell2,...
         numel(bioa),...
+        nperts,...
         args.corr_type,...
         DI);
     title(title_str,'interpreter','none')

@@ -1,16 +1,19 @@
-function pdi = compute_pairwise_diversity_index(ds, varargin)
+function [pdi, data_struct] = compute_pairwise_diversity_index(ds, varargin)
 %pdi = compute_pairwise_diversity_index(ds, varargin)
 %
 %Given a ds of signatures, computes the pairwise diversity index for all
-%cell lines
+%cell lines. ds should be a genex x samples GCT struct containing signatures across > 1
+%cell lines. Each cell line must be annotated in the cell_id field of
+%cdesc.
 %
-%Input: ds: a genes x perturbagens struct containing the gex data
+%Input: ds: a genes x samples struct containing the gex data
 %       prune_ds: Boolean. If true we only consider signatures that have a
 %                   prune_field appearing across ALL cell lines in the ds. Setting
-%                   prune_ds to true ensures that all pairwise distances between lines
+%                   prune_ds to true ensures that all pairwise diversities between lines
 %                   are computed using the same set of perturbagens. Default true.
-%       prune_field: The column field to match on. Default is 'pert_id_dose_time'
-%       metric: The metric used to quantify diversity.
+%       prune_field: The column field to prune on. Default is 'pert_id'
+%       metric: The metric used to quantify diversity. Default
+%           rel_bio_corr. Other options are not recommended.
 %       corr_type: Type of correlation to use. Default is spearman.
 %       corr_bkg_type: Background of correlations against which to compute 
 %                   diversities. Options are 'global' or 'local'. Default
@@ -25,7 +28,7 @@ function pdi = compute_pairwise_diversity_index(ds, varargin)
 %       show_plot: Boolean, whether to make plot visible. Default false
 %       save_plot: Boolean, whether to save plots to disk. Default false
 %       plot_dir:  Directory to save plots to. 
-%       save_gctx: Boolean, whether to save the pairwise distance gctx.
+%       save_gctx: Boolean, whether to save the pairwise diversity gctx.
 %                  Defualt false
 %       gctx_dir: Directory to save gctx to
 %                
@@ -48,7 +51,7 @@ params = {'prune_ds',...
           'save_gctx',...
           'gctx_dir'};
 dflts = {true,...
-         'pert_id_dose_time',...
+         'pert_id',...
          '',...
          '',...
          'rel_bioa_corr',...
@@ -70,15 +73,12 @@ pert_ids = get_array_input(args.pert_ids,unique(ds.cdesc(:,ds.cdict('pert_id')))
 
 %Make sure we have at least two cell lines
 assert(numel(cell_lines) >= 2, 'Must have at least two cell lines')
-assert(numel(pert_ids) >= 2, 'Must have at least two pert ids')
 
-%subset ds to pert_ids
-if ~isempty(pert_ids)
-    ds = subset_ds(ds,'pert_id',pert_ids);
-end
+%Subset ds to pert_ids
+ds = ds_subset(ds,'pert_id',pert_ids);
 
-%Remove signatures that have -666 for ccq75 (ones that have 1 replicate)
-bad_idx = cell2mat((ds.cdesc(:,ds.cdict('distil_cc_q75')))) == -666;
+%Remove signatures that have less than two replicates
+bad_idx = cell2mat((ds.cdesc(:,ds.cdict('distil_nsample')))) < 2;
 ds = ds_slice(ds, 'cid', ds.cid(bad_idx), 'exclude_cid', true);
 
 %If requested subset ds to only signatures that appear once in each line.
@@ -88,9 +88,16 @@ end
 
 %Compute global correlation background
 if strcmp(args.corr_bkg_type,'global')
-    ds_corr_bkg = select_training_data_function(ds,'cell_lines',cell_lines,'match_field','pert_id');
-    corrs = fastcorr(ds_corr_bkg.mat,'type',args.corr_type);
+    %ds_corr_bkg = select_training_data_function(ds,'cell_lines',cell_lines,'match_field',args.prune_field);
+    ds_corr_bkg = ds;
+    
+%     subsample = 100;
+%     idx = randperm(numel(ds.cid),subsample); 
+    
+    corrs = fastcorr(ds_corr_bkg.mat(:,:),'type',args.corr_type);
+
     [~, corr_bkg] = mat2vec_diag(corrs);
+    
     [corr_xform,corr_mesh] = compute_xform(corr_bkg,'cdf','fast_kde');
     args.corr_xform = corr_xform;
     args.corr_mesh = corr_mesh;
@@ -102,11 +109,12 @@ pdi = mkgctstruct(mat,'rid',cell_lines,'cid',cell_lines);
 
 %% Compute the diversity index for each pair of lines. 
 for ii = 1:numel(cell_lines)
-    ds1 = subset_ds(ds,'cell_id',cell_lines(ii));
+    ds1 = ds_subset(ds,'column','cell_id',cell_lines(ii));
 
     for jj = (ii+1):numel(cell_lines)
-        ds2 = subset_ds(ds,'cell_id',cell_lines(jj));
-        this_pdi = compute_diversity_index_two(ds1,ds2,args);
+        ds2 = ds_subset(ds,'column','cell_id',cell_lines(jj));
+        
+        [this_pdi,data_struct] = compute_diversity_index_two(ds1,ds2,args);
         
         assert(~isnan(this_pdi),'Pairwise diversity evaluated to NaN')
         pdi.mat(ii,jj) = this_pdi;
@@ -125,7 +133,7 @@ end
 
 end
 
-function ds = subset_ds(ds,field,to_include)
-    good_idx = find(ismember(ds.cdesc(:,ds.cdict(field)),to_include));
-    ds = ds_slice(ds, 'cidx', good_idx);
-end
+% function ds = subset_ds(ds,field,to_include)
+%     good_idx = find(ismember(ds.cdesc(:,ds.cdict(field)),to_include));
+%     ds = ds_slice(ds, 'cidx', good_idx);
+% end
